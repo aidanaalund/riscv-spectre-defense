@@ -2,6 +2,7 @@
 
 ## Project Structure (TBD)
 
+```
 spectre-defenses-riscv-gem5/
 ├── README.md                          # Project overview, setup, and usage
 ├── .gitignore
@@ -97,3 +98,4 @@ spectre-defenses-riscv-gem5/
 │
 ├── Makefile                           # Build shortcuts
 ├──  requirements.txt                   # Python dependencies
+```
