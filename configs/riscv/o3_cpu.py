@@ -2,7 +2,7 @@
 
 Usage:
   build/RISCV/gem5.opt configs/riscv/o3_cpu.py --cmd path/to/static_rv64_binary \
-      [--options "args"] [--defense baseline] [--max-insts N]
+      [--options "args"] [--core boom|p870] [--defense baseline] [--max-insts N]
 
 Run from the gem5 tree (or pass --outdir via gem5's -d). The repo configs dir is
 added to sys.path so this file works regardless of the working directory.
@@ -20,7 +20,10 @@ from m5.objects import (
     SimpleMemory, SrcClockDomain, System, SystemXBar, TournamentBP, VoltageDomain,
 )
 
-from common import default as D
+from common import default as BOOM
+from common import p870 as P870
+
+CORES = {"boom": BOOM, "p870": P870}
 
 BPS = {"LTAGE": LTAGE, "Tournament": TournamentBP, "BiMode": BiModeBP}
 
@@ -42,13 +45,16 @@ def make_cache(cls, p):
 
 
 def build(args):
+    D = CORES[args.core]
     system = System()
     system.clk_domain = SrcClockDomain(clock=D.CLOCK, voltage_domain=VoltageDomain())
     system.mem_mode = "timing"
     system.mem_ranges = [AddrRange(D.MEM_SIZE)]
 
     cpu = RiscvO3CPU(**D.CORE)
-    cpu.branchPred = BPS[args.bp]()
+    cpu.branchPred = BPS[args.bp or D.BRANCH_PRED]()
+    if hasattr(D, "RAS_SIZE"):
+        cpu.branchPred.ras.numEntries = D.RAS_SIZE
     system.cpu = cpu
 
     # Caches
@@ -81,7 +87,8 @@ def main():
     ap.add_argument("--cmd", required=True, help="static RV64 ELF to run")
     ap.add_argument("--options", default="", help="arguments to the binary")
     ap.add_argument("--defense", default="baseline", choices=["baseline"])
-    ap.add_argument("--bp", default=D.BRANCH_PRED, choices=sorted(BPS))
+    ap.add_argument("--core", default="boom", choices=sorted(CORES))
+    ap.add_argument("--bp", default=None, choices=sorted(BPS), help="default: core's predictor")
     ap.add_argument("--max-insts", type=int, default=0, help="stop after N committed insts (0=run to exit)")
     args = ap.parse_args()
 
@@ -99,7 +106,7 @@ def main():
 
     root = Root(full_system=False, system=system)
     m5.instantiate()
-    print(f"Running {args.cmd} on RV64GC O3 ({args.defense}, bp={args.bp})")
+    print(f"Running {args.cmd} on RV64GC O3 ({args.core}, {args.defense}, bp={args.bp})")
     ev = m5.simulate()
     print(f"Exited @ tick {m5.curTick()}: {ev.getCause()}")
 
