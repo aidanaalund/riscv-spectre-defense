@@ -123,3 +123,33 @@ spectre-defenses-riscv-gem5/
 ├── Makefile                           # Build shortcuts
 ├──  requirements.txt                   # Python dependencies
 ```
+
+
+
+RUN INFO FOR LINUX BOOT:
+
+./build/RISCV/gem5.opt configs/example/gem5_library/riscv-ubuntu-run.py
+
+LIVE VIEW INSTRUCTION COUNTS:
+cd /workspaces/gem5 && while true; do kill -USR1 $(pgrep -n gem5.opt); sleep 5; grep -E '^(simTicks|simInsts) ' m5out/stats.txt | tail -n 2; echo '---'; done
+
+Live Linux console output
+cd /workspaces/gem5 && tail -n 20 -f m5out/board.platform.terminal
+
+Once boot finsihes:
+
+make -C util/term
+
+Connect: 
+
+cd /workspaces/gem5 && ./util/term/m5term 127.0.0.1 <port#>
+
+port # can be seen in output :
+
+board.platform.terminal: Listening for connections on port 3456
+
+Once atomic cpu boots, switch to o3cpu:
+
+from booted terminal run:
+
+gem5-bridge hypercall 4
