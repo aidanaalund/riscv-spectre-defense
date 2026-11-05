@@ -13,3 +13,6 @@ m5out
 *~
 .*.swp
 .*.swo
+
+# Project
+results/

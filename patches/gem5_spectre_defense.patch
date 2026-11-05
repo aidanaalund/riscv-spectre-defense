@@ -1,0 +1,48 @@
+diff --git a/src/arch/riscv/isa/decoder.isa b/src/arch/riscv/isa/decoder.isa
+index 569da4b942..24ee2e9420 100644
+--- a/src/arch/riscv/isa/decoder.isa
++++ b/src/arch/riscv/isa/decoder.isa
+@@ -1333,6 +1333,21 @@ decode QUADRANT default Unknown::unknown() {
+             }
+         }
+ 
++        // spectre-defense project: custom-0 major opcode (0x0b) = speculation
++        // barrier "spec.fence" (an lfence-equivalent RISC-V has no architected
++        // form of). funct3=0, rd=rs1=rs2=0 => raw word 0x0000000b, emitted via
++        // .insn by benchmarks/riscv_asm.h. IsNonSpeculative makes it execute
++        // only at the ROB head (after older branches resolve); IsSerializeAfter
++        // forces the *next* instruction to wait until this one commits. Net
++        // effect on the O3 CPU: loads after the barrier cannot issue past an
++        // unresolved bounds-check branch, closing the Spectre-v1 window.
++        0x02: decode FUNCT3 {
++            format SystemOp {
++                0x0: spec_fence({{
++                }}, IsSerializeAfter, IsNonSpeculative, No_OpClass);
++            }
++        }
++
+         0x03: decode FUNCT3 {
+             format FenceOp {
+                 0x0: fence({{
+diff --git a/src/arch/riscv/process.cc b/src/arch/riscv/process.cc
+index 29160e5b5a..914408f3f2 100644
+--- a/src/arch/riscv/process.cc
++++ b/src/arch/riscv/process.cc
+@@ -109,6 +109,17 @@ RiscvProcess64::initState()
+         fatal_if(!(misa.rvu && misa.rvs),
+             "RISC V SE mode can't run without supervisor and user "
+             "privilege modes.");
++        // spectre-defense project: enable Zicbom cache-block management ops
++        // (cbo.flush/clean/inval/zero) from user mode in SE mode, so the
++        // Flush+Reload benchmarks can flush lines. Mirrors setting
++        // senvcfg.{CBCFE,CBIE,CBZE} as an OS normally would.
++        {
++            SENVCFG senvcfg = tc->readMiscRegNoEffect(MISCREG_SENVCFG);
++            senvcfg.cbcfe = 1;      // cbo.flush / cbo.clean in U-mode
++            senvcfg.cbie  = 1;      // cbo.inval in U-mode (1 = invalidate)
++            senvcfg.cbze  = 1;      // cbo.zero in U-mode
++            tc->setMiscRegNoEffect(MISCREG_SENVCFG, senvcfg);
++        }
+     }
+ }
+ 

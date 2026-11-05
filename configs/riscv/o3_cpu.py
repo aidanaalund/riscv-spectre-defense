@@ -16,7 +16,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 
 import m5
 from m5.objects import (
-    AddrRange, BiModeBP, Cache, L2XBar, LTAGE, Process, RiscvO3CPU, Root, SEWorkload,
+    AddrRange, BiModeBP, BranchPredictor, Cache, IQUnit, L2XBar, LTAGE, Process, RiscvO3CPU,
+    Root, SEWorkload,
     SimpleMemory, SrcClockDomain, System, SystemXBar, TournamentBP, VoltageDomain,
 )
 
@@ -51,8 +52,18 @@ def build(args):
     system.mem_mode = "timing"
     system.mem_ranges = [AddrRange(D.MEM_SIZE)]
 
-    cpu = RiscvO3CPU(**D.CORE)
-    cpu.branchPred = BPS[args.bp or D.BRANCH_PRED]()
+    core_params = dict(D.CORE)
+    # gem5 v25.1 moved the instruction-queue size out of the CPU and into a
+    # vector of IQUnit SimObjects, so numIQEntries is applied separately.
+    num_iq = core_params.pop("numIQEntries", None)
+    cpu = RiscvO3CPU(**core_params)
+    if num_iq is not None:
+        cpu.instQueues = [IQUnit(numEntries=num_iq)]
+    # gem5 v25.1 split the predictor: a BranchPredictor (BPU) wrapper holds a
+    # pluggable conditionalBranchPred algorithm (LTAGE/Tournament/BiMode).
+    # instShiftAmt=1 for RISC-V (2-byte min instruction alignment with RVC).
+    cond_pred = BPS[args.bp or D.BRANCH_PRED]()
+    cpu.branchPred = BranchPredictor(instShiftAmt=1, conditionalBranchPred=cond_pred)
     if hasattr(D, "RAS_SIZE"):
         cpu.branchPred.ras.numEntries = D.RAS_SIZE
     system.cpu = cpu
@@ -86,7 +97,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--cmd", required=True, help="static RV64 ELF to run")
     ap.add_argument("--options", default="", help="arguments to the binary")
-    ap.add_argument("--defense", default="baseline", choices=["baseline"])
+    ap.add_argument("--defense", default="baseline", choices=["baseline", "lfence"])
     ap.add_argument("--core", default="boom", choices=sorted(CORES))
     ap.add_argument("--bp", default=None, choices=sorted(BPS), help="default: core's predictor")
     ap.add_argument("--max-insts", type=int, default=0, help="stop after N committed insts (0=run to exit)")
@@ -94,7 +105,7 @@ def main():
 
     system, cpu = build(args)
 
-    mod = {"baseline": "no_defense"}[args.defense]
+    mod = {"baseline": "no_defense", "lfence": "lfence"}[args.defense]
     importlib.import_module("defenses." + mod).apply(system, cpu)
 
     system.workload = SEWorkload.init_compatible(args.cmd)

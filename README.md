@@ -1,6 +1,30 @@
 # RISC-V Spectre Defense Project
 
-## Project Structure (TBD)
+Simulate Spectre v1 on RV64GC out-of-order cores in gem5 and demonstrate a
+RISC-V speculation-barrier defense (`spec.fence`, an `lfence` equivalent).
+
+## Quick start
+
+```bash
+# Option A: Docker (recommended for teammates — pins a gem5-supported toolchain)
+make docker-build           # thin layer on the official gem5 deps image
+make docker-shell           # repo at /work/repo, persistent gem5 build volume
+#   inside the container:
+docker/build-gem5.sh                                   # clone+patch+build gem5
+make build-benchmarks
+GEM5=/work/gem5/build/RISCV/gem5.opt make experiment   # run the matrix
+make plot
+# See docker/README.md for details.
+
+# Option B: native (set up gem5 + riscv64-linux-gnu-gcc yourself)
+#   Build gem5 with a SUPPORTED compiler (GCC 11-14.2 or clang; a newer GCC
+#   miscompiles the O3 model). Apply patches/ first — see patches/README.md.
+make build-gem5             # expects gem5 at ~/Applications/gem5
+make experiment             # {boom} x {self-test, spectre baseline/lfence, ...}
+make plot
+```
+
+## Project Structure (WIP)
 
 ```
 spectre-defenses-riscv-gem5/
