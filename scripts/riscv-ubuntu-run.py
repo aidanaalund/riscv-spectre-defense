@@ -74,7 +74,7 @@ memory = DualChannelDDR4_2400(size="3GiB")
 
 # Here we set up the processor. We use a simple processor.
 processor = SimpleSwitchableProcessor(
-    starting_core_type=CPUTypes.ATOMIC,
+    starting_core_type=CPUTypes.O3, # ignore this for now switch may not be necessary 
     switch_core_type=CPUTypes.O3,
     isa=ISA.RISCV,
     num_cores=2,
