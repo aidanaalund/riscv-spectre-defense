@@ -109,6 +109,17 @@ RiscvProcess64::initState()
         fatal_if(!(misa.rvu && misa.rvs),
             "RISC V SE mode can't run without supervisor and user "
             "privilege modes.");
+        // spectre-defense project: enable Zicbom cache-block management ops
+        // (cbo.flush/clean/inval/zero) from user mode in SE mode, so the
+        // Flush+Reload benchmarks can flush lines. Mirrors setting
+        // senvcfg.{CBCFE,CBIE,CBZE} as an OS normally would.
+        {
+            SENVCFG senvcfg = tc->readMiscRegNoEffect(MISCREG_SENVCFG);
+            senvcfg.cbcfe = 1;      // cbo.flush / cbo.clean in U-mode
+            senvcfg.cbie  = 1;      // cbo.inval in U-mode (1 = invalidate)
+            senvcfg.cbze  = 1;      // cbo.zero in U-mode
+            tc->setMiscRegNoEffect(MISCREG_SENVCFG, senvcfg);
+        }
     }
 }
 

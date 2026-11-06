@@ -1341,6 +1341,21 @@ decode QUADRANT default Unknown::unknown() {
             }
         }
 
+        // spectre-defense project: custom-0 major opcode (0x0b) = speculation
+        // barrier "spec.fence" (an lfence-equivalent RISC-V has no architected
+        // form of). funct3=0, rd=rs1=rs2=0 => raw word 0x0000000b, emitted via
+        // .insn by benchmarks/riscv_asm.h. IsNonSpeculative makes it execute
+        // only at the ROB head (after older branches resolve); IsSerializeAfter
+        // forces the *next* instruction to wait until this one commits. Net
+        // effect on the O3 CPU: loads after the barrier cannot issue past an
+        // unresolved bounds-check branch, closing the Spectre-v1 window.
+        0x02: decode FUNCT3 {
+            format SystemOp {
+                0x0: spec_fence({{
+                }}, IsSerializeAfter, IsNonSpeculative, No_OpClass);
+            }
+        }
+
         0x03: decode FUNCT3 {
             format FenceOp {
                 0x0: fence({{
