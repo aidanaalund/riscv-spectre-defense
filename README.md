@@ -126,7 +126,7 @@ spectre-defenses-riscv-gem5/
 
 
 
-RUN INFO FOR LINUX BOOT:
+RUN INFO FOR LINUX BOOT: ( from root of gem5)
 
 ./build/RISCV/gem5.opt configs/example/gem5_library/riscv-ubuntu-run.py
 
@@ -148,8 +148,45 @@ port # can be seen in output :
 
 board.platform.terminal: Listening for connections on port 3456
 
-Once atomic cpu boots, switch to o3cpu:
 
-from booted terminal run:
+UPDATES 11/13:
 
-gem5-bridge hypercall 4
+1. Save checkpoint (inside gem5 Ubuntu):
+gem5-bridge hypercall 7
+
+
+
+
+
+2. Resume from checkpoint (Docker terminal, from /workspaces/gem5):
+./build/RISCV/gem5.opt configs/example/gem5_library/riscv-ubuntu-run.py --restore
+
+
+
+
+
+3. Compile with -O0 (Docker terminal, from /workspaces/gem5):
+riscv64-linux-gnu-gcc -O0 -pthread -static -march=rv64gc_zicbom benchmarks/cross_core/cross_core_spectre_v1.c -o benchmarks/cross_core/cross_core_spectre_v1
+
+
+
+
+
+4. Transfer executable (inside gem5 Ubuntu, already in /tmp):
+gem5-bridge readfile > cross_core_spectre_v1
+
+
+
+
+
+5. Make executable (inside gem5 Ubuntu, in /tmp):
+chmod +x cross_core_spectre_v1
+
+
+
+
+
+6. Run (inside gem5 Ubuntu, in /tmp):
+./cross_core_spectre_v1
+
+Successfully able to run cross core spectre I think - need to look through code tbh

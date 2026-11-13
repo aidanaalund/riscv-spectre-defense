@@ -41,6 +41,8 @@ scons build/ALL/gem5.opt
 """
 
 from gem5.components.boards.riscv_board import RiscvBoard
+from pathlib import Path
+import sys
 
 # With RISCV, we use simple caches.
 from gem5.components.cachehierarchies.classic.private_l1_shared_l2_cache_hierarchy import (
@@ -74,7 +76,7 @@ memory = DualChannelDDR4_2400(size="3GiB")
 
 # Here we set up the processor. We use a simple processor.
 processor = SimpleSwitchableProcessor(
-    starting_core_type=CPUTypes.ATOMIC,
+    starting_core_type=CPUTypes.O3, # ignore this for now switch may not be necessary 
     switch_core_type=CPUTypes.O3,
     isa=ISA.RISCV,
     num_cores=2,
@@ -95,10 +97,35 @@ board = RiscvBoard(
 
 # The simulated system's stdout can be viewed in
 # `m5out/board.platform.terminal`.
-
-board.set_workload(
-    obtain_resource("riscv-ubuntu-24.04-boot", resource_version="2.0.0")
+workload = obtain_resource(
+    "riscv-ubuntu-24.04-boot",
+    resource_version="2.0.0",
 )
+
+workload.set_parameter(
+    "readfile",
+    str(
+        Path(
+            "benchmarks/cross_core/cross_core_spectre_v1"
+        ).resolve()
+    ),
+)
+
+if "--restore" in sys.argv:
+    checkpoints = sorted(
+        Path("checkpoints").glob("cpt.*"),
+        key=lambda p: int(p.name.split(".")[1]),
+    )
+
+    if not checkpoints:
+        raise FileNotFoundError("No checkpoints found!")
+
+    checkpoint_path = checkpoints[-1].resolve()
+    print(f"Restoring checkpoint: {checkpoint_path}")
+
+    workload.set_parameter("checkpoint", checkpoint_path)
+
+board.set_workload(workload)
 
 board.append_kernel_arg("no_systemd=true")
 board.append_kernel_arg("interactive=true")
@@ -153,6 +180,6 @@ class SwitchToO3Handler(ExitHandler, hypercall_num=4):
     def _exit_simulation(self) -> bool:
         return False
 
-
 simulator = Simulator(board=board)
+simulator._checkpoint_path = Path("checkpoints")
 simulator.run()
