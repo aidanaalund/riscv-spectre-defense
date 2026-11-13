@@ -36,6 +36,21 @@
 #define TRAINING_EPOCH 8
 #define BUF_SIZE 20
 
+/* Speculation-window probe (compile with -DPAD=N): N independent nops are
+ * placed between the bounds check and the leaking load. Each occupies a ROB
+ * slot (and fetch/decode bandwidth) but no register or IQ entry, so the leak
+ * survives only while (older insts + N) fits in the window the core opens
+ * before the flushed array_size returns and the branch resolves. Sweeping N
+ * measures that window per core (BOOM vs P870). PAD=0 == the normal PoC. */
+#ifndef PAD
+#define PAD 0
+#endif
+#define _STR(x) #x
+#define STR(x) _STR(x)
+#define PAD_INSNS() __asm__ __volatile__(".option push\n.option norvc\n" \
+                                         ".rept " STR(PAD) "\nnop\n.endr\n" \
+                                         ".option pop\n" ::: "memory")
+
 /* Randomized run-length mistraining (compile with -DRAND_TRAIN): instead of a
  * fixed period, use a pseudo-random number of in-bounds training calls in
  * [TRAIN_MIN,TRAIN_MAX] before each out-of-bounds attack call. The branch's
@@ -76,7 +91,7 @@ static inline void decorrelate(uint64_t k) {
     _decorr_sink = s;
 }
 
-const char *secret = "InfoSec!";   /* short to keep sim time down */
+const char *secret = "ece382n!";   /* short to keep sim time down */
 
 static uint64_t calibrate_latency(void) {
     uint64_t hit = 0, miss = 0, rep = 1000;
@@ -125,6 +140,7 @@ int victim(uint8_t *pages, size_t idx, size_t stride) {
     int sink = 0;
     if (idx < array_size) {       /* mistrained branch */
         SPEC_BARRIER();           /* DEFENSE: no speculative use of idx past here */
+        PAD_INSNS();              /* window probe; empty unless -DPAD=N */
         sink = pages[array[idx] * stride];
     }
     return sink;
@@ -151,6 +167,7 @@ int main(void) {
     size_t stride = STRIDE;
 
     size_t malicious_index = (uintptr_t)secret - (uintptr_t)array;
+    printf("Pad      : %d nops between bounds check and gadget load\n", PAD);
     printf("secret@%p array@%p  malicious_index=%#zx\n",
            (void *)secret, (void *)array, malicious_index);
     printf("-----------------------------------------\n");

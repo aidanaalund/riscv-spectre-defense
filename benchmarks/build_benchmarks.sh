@@ -33,3 +33,12 @@ echo "built $OUT/spectre_v1_rv_rand_lfence (defense, randomized run-length)"
 
 echo "---"
 file "$OUT"/* 2>/dev/null || ls -l "$OUT"
+
+# Speculation-window sweep: baseline (periodic) PoC with N nops between the
+# bounds check and the gadget load. Used by run_experiment.py --sweep.
+PADS="${PADS:-0 16 32 48 64 80 84 88 92 96 112 128 192 256 384 512 640 768 896 1024 1056 1088 1104 1120 1152}"
+mkdir -p "$OUT/pad"
+for n in $PADS; do
+    $CC $CFLAGS -DPAD="$n" spectre_poc/spectre_v1_rv.c -o "$OUT/pad/spectre_v1_rv_pad$n"
+done
+echo "built $OUT/pad/spectre_v1_rv_pad{${PADS// /,}}"

@@ -53,6 +53,9 @@ def build(args):
     system.mem_ranges = [AddrRange(D.MEM_SIZE)]
 
     core_params = dict(D.CORE)
+    for kv in args.set:                      # --set key=val core overrides
+        k, v = kv.split("=", 1)
+        core_params[k] = int(v) if v.lstrip("-").isdigit() else v
     # gem5 v25.1 moved the instruction-queue size out of the CPU and into a
     # vector of IQUnit SimObjects, so numIQEntries is applied separately.
     num_iq = core_params.pop("numIQEntries", None)
@@ -100,6 +103,8 @@ def main():
     ap.add_argument("--defense", default="baseline", choices=["baseline", "lfence"])
     ap.add_argument("--core", default="boom", choices=sorted(CORES))
     ap.add_argument("--bp", default=None, choices=sorted(BPS), help="default: core's predictor")
+    ap.add_argument("--set", action="append", default=[], metavar="KEY=VAL",
+                    help="override a core parameter (repeatable)")
     ap.add_argument("--max-insts", type=int, default=0, help="stop after N committed insts (0=run to exit)")
     args = ap.parse_args()
 

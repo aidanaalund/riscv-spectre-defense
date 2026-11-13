@@ -398,6 +398,13 @@ class CPU : public BaseCPU
      */
     std::queue<ListIt> removeList;
 
+    /** spectre-defense project fix: seqNums already queued in removeList
+     *  this cycle. Commit and fetch can both call removeInstsNotInROB in one
+     *  cycle (commit for a new squash, fetch for an older one arriving after
+     *  commitToFetchDelay); without this the same instList node is queued
+     *  twice and erased twice (use-after-free). */
+    std::set<InstSeqNum> removeListed;
+
 #ifdef GEM5_DEBUG
     /** Debug structure to keep track of the sequence numbers still in
      * flight.
