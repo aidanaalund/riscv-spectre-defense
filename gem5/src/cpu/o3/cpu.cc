@@ -1185,8 +1185,9 @@ CPU::removeFrontInst(const DynInstPtr &inst)
 
     removeInstsThisCycle = true;
 
-    // Remove the front instruction.
-    removeList.push(inst->getInstListIt());
+    // Remove the front instruction (at most once per cycle).
+    if (removeListed.insert(inst->seqNum).second)
+        removeList.push(inst->getInstListIt());
 }
 
 void
@@ -1276,8 +1277,9 @@ CPU::squashInstIt(const ListIt &instIt, ThreadID tid)
 
         // @todo: Formulate a consistent method for deleting
         // instructions from the instruction list
-        // Remove the instruction from the list.
-        removeList.push(instIt);
+        // Remove the instruction from the list (at most once per cycle).
+        if (removeListed.insert((*instIt)->seqNum).second)
+            removeList.push(instIt);
     }
 }
 
@@ -1296,6 +1298,7 @@ CPU::cleanUpRemovedInsts()
         removeList.pop();
     }
 
+    removeListed.clear();
     removeInstsThisCycle = false;
 }
 /*

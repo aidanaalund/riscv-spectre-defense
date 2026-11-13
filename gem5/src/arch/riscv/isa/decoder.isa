@@ -1333,13 +1333,10 @@ decode QUADRANT default Unknown::unknown() {
             }
         }
 
-        // Custom LFENCE instruction (opcode 0x0B)
-        0x02: decode FUNCT3 {
-            format FenceOp {
-                0x0: lfence({{
-                }}, uint64_t, IsSerializeAfter, No_OpClass);
-            }
-        }
+        // NOTE: an earlier custom "lfence" (FenceOp, IsSerializeAfter only)
+        // also claimed custom-0 here; it was a duplicate case value with
+        // spec_fence below and broke the build, so spec_fence (which adds
+        // IsNonSpeculative) is the single decoding of 0x0000000b.
 
         // spectre-defense project: custom-0 major opcode (0x0b) = speculation
         // barrier "spec.fence" (an lfence-equivalent RISC-V has no architected

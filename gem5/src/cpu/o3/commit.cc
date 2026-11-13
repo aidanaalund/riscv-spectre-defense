@@ -517,6 +517,16 @@ Commit::squashAll(ThreadID tid)
     rob->squash(squashed_inst, tid);
     changedROBNumEntries[tid] = true;
 
+    // spectre-defense project fix: kill every in-flight instruction that has
+    // not yet reached the ROB *now*. They are all younger than the ROB tail,
+    // hence younger than the squash point, hence wrong-path. Stock gem5 only
+    // marks them when fetch processes the squash (Fetch::squashFromCommit),
+    // which happens commitToFetchDelay cycles later; with that delay > 1 a
+    // wrong-path inst renamed in the squash cycle reaches IEW/the ROB first,
+    // unmarked, and is later committed (seen as wild-address faults and
+    // "Dependency graph not empty" panics on the P870 config).
+    cpu->removeInstsNotInROB(tid);
+
     // Send back the sequence number of the squashed instruction.
     toIEW->commitInfo[tid].doneSeqNum = squashed_inst;
 
@@ -819,6 +829,10 @@ Commit::commit()
 
             rob->squash(squashed_inst, tid);
             changedROBNumEntries[tid] = true;
+
+            // spectre-defense project fix: see Commit::squashAll -- mark
+            // wrong-path insts not yet in the ROB as squashed immediately.
+            cpu->removeInstsNotInROB(tid);
 
             toIEW->commitInfo[tid].doneSeqNum = squashed_inst;
 
