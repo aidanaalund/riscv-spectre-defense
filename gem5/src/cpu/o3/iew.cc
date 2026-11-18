@@ -1144,6 +1144,28 @@ IEW::executeInsts()
         fetchRedirect[tid] = false;
     }
 
+    // spectre-defense (SPT, Lazy implicit flow): tainted mispredicts whose
+    // squash was deferred are sent to commit once they reach the VP. They
+    // compete with this cycle's mispredicts exactly like a fresh one.
+    if (cpu->spt.enabled()) {
+        for (ThreadID tid : *activeThreads) {
+            for (const DynInstPtr &inst :
+                     cpu->spt.takeRaisableSquashes(tid)) {
+                if (!fetchRedirect[tid] || !toCommit->squash[tid] ||
+                    toCommit->squashedSeqNum[tid] > inst->seqNum) {
+                    fetchRedirect[tid] = true;
+                    squashDueToBranch(inst, tid);
+                    ppMispredict->notify(inst);
+                    if (inst->readPredTaken()) {
+                        iewStats.predictedTakenIncorrect++;
+                    } else {
+                        iewStats.predictedNotTakenIncorrect++;
+                    }
+                }
+            }
+        }
+    }
+
     // Uncomment this if you want to see all available instructions.
     // @todo This doesn't actually work anymore, we should fix it.
 //    printAvailableInsts();
@@ -1192,6 +1214,17 @@ IEW::executeInsts()
         if (inst->isMemRef()) {
             DPRINTF(IEW, "Execute: Calculating address for memory "
                     "reference.\n");
+
+            // spectre-defense (SPT): a transmitter with a secret address
+            // must not touch the TLB or caches until it reaches the VP.
+            // Park it with the IQ's deferred mem insts; it is re-issued
+            // once its address operand is public.
+            if (cpu->spt.gateBlocks(inst)) {
+                cpu->spt.noteDelayed(inst);
+                instQueue.deferMemInst(inst);
+                continue;
+            }
+            cpu->spt.noteReleased(inst);
 
             // Tell the LDSTQ to execute this instruction (if it is a load).
             if (inst->isAtomic()) {
@@ -1285,7 +1318,16 @@ IEW::executeInsts()
         // instruction first, so the branch resolution order will be correct.
         ThreadID tid = inst->threadNumber;
 
-        if (!fetchRedirect[tid] ||
+        if (inst->isControl() && inst->mispredicted() &&
+            cpu->spt.deferSquash(inst)) {
+            // spectre-defense (SPT, Lazy implicit flow + Mosier's 2025
+            // fix): a mispredicted branch with secret operands must not
+            // squash until it reaches the VP. It is marked pending and kept
+            // out of this cycle's redirect arbitration entirely, so it
+            // cannot mask a younger, public mispredict.
+            DPRINTF(IEW, "[tid:%i] [sn:%llu] Tainted mispredict: squash "
+                    "deferred.\n", tid, inst->seqNum);
+        } else if (!fetchRedirect[tid] ||
             !toCommit->squash[tid] ||
             toCommit->squashedSeqNum[tid] > inst->seqNum) {
 

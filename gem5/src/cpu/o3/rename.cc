@@ -1138,6 +1138,9 @@ Rename::renameDestRegs(const DynInstPtr &inst, ThreadID tid)
 
         scoreboard->unsetReg(rename_result.first);
 
+        // spectre-defense (SPT): freshly produced values are secret.
+        cpu->spt.taintRenamedDest(rename_result.first);
+
         DPRINTF(Rename,
                 "[tid:%i] "
                 "Renaming arch reg %i (%s) to physical reg %i (%i).\n",

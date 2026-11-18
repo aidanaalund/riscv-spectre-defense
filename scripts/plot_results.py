@@ -290,6 +290,146 @@ def plot_window(data):
     print(f"wrote {out}")
 
 
+
+
+# --------------------------------------------------------------- perf ----
+# Categorical palette, fixed slot order (validated: lightness band, chroma
+# floor, CVD separation, normal-vision floor all PASS on a #fcfcfb surface).
+# Order is by defense identity and never cycled or re-assigned when a filter
+# drops a series.
+DEFENSE_COLOR = {
+    "baseline":  "#2a78d6",
+    "fence":     "#eb6834",
+    "spt":       "#1baf7a",
+    "spt_ideal": "#eda100",
+}
+DEFENSE_LABEL = {
+    "baseline":  "Baseline (no defense)",
+    "fence":     "Fence (delay all accesses)",
+    "spt":       "SPT",
+    "spt_none":  "SPT (no untaint)",
+    "spt_fwd":   "SPT (forward untaint)",
+    "spt_ideal": "SPT (ideal untaint)",
+}
+DEFENSE_ORDER = ["baseline", "fence", "spt", "spt_none", "spt_fwd", "spt_ideal"]
+
+
+def _gmean(xs):
+    if not xs:
+        return None
+    prod = 1.0
+    for x in xs:
+        prod *= x
+    return prod ** (1.0 / len(xs))
+
+
+def perf_table(data):
+    """Normalized-IPC table. Printed as well as plotted: the fills sit below
+    3:1 against the surface, so the numbers must be legible without color."""
+    runs = [r for r in data["runs"] if r.get("suite") == "spec"]
+    if not runs:
+        return {}
+    out = {}
+    for core in sorted({r["core"] for r in runs}):
+        base = {r["workload"]: r["stats"].get("ipc")
+                for r in runs if r["core"] == core and r["defense"] == "baseline"}
+        per_def = {}
+        for d in DEFENSE_ORDER:
+            vals = {}
+            for r in runs:
+                if r["core"] != core or r["defense"] != d:
+                    continue
+                b, i = base.get(r["workload"]), r["stats"].get("ipc")
+                if b and i:
+                    vals[r["workload"]] = i / b
+            if vals:
+                per_def[d] = vals
+        if per_def:
+            out[core] = per_def
+
+    for core, per_def in out.items():
+        loads = sorted({w for v in per_def.values() for w in v})
+        print(f"\n=== Normalized IPC vs. baseline — {core} ===")
+        print(f"  {'benchmark':20s} " +
+              " ".join(f"{d:>12s}" for d in per_def))
+        for w in loads:
+            print(f"  {w:20s} " +
+                  " ".join(f"{per_def[d].get(w, float('nan')):>12.3f}"
+                           for d in per_def))
+        print(f"  {'GMEAN':20s} " +
+              " ".join(f"{(_gmean([v for v in per_def[d].values()]) or 0):>12.3f}"
+                       for d in per_def))
+    return out
+
+
+def plot_perf(data):
+    """Grouped bars: normalized IPC per benchmark, one group per benchmark,
+    one bar per defense, plus a GMean group. Baseline == 1.0 reference."""
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        import numpy as np
+    except Exception as e:
+        print(f"(matplotlib unavailable: {e}; table only)")
+        return
+
+    table = perf_table(data)
+    for core, per_def in table.items():
+        defs_ = [d for d in DEFENSE_ORDER if d in per_def]
+        loads = sorted({w for v in per_def.values() for w in v})
+        if not loads:
+            continue
+        cats = loads + ["GMean"]
+        x = np.arange(len(cats))
+        # 2px-equivalent surface gap between adjacent bars in a group.
+        group_w = 0.78
+        bar_w = group_w / len(defs_) * 0.88
+
+        fig, ax = plt.subplots(figsize=(1.5 + 1.15 * len(cats), 3.6), dpi=200)
+        fig.patch.set_facecolor("#fcfcfb")
+        ax.set_facecolor("#fcfcfb")
+
+        for k, d in enumerate(defs_):
+            vals = [per_def[d].get(w, float("nan")) for w in loads]
+            vals.append(_gmean([v for v in per_def[d].values()]) or float("nan"))
+            offs = -group_w / 2 + bar_w / 2 + k * (group_w / len(defs_))
+            bars = ax.bar(x + offs, vals, bar_w,
+                          color=DEFENSE_COLOR.get(d, "#6250d6"),
+                          label=DEFENSE_LABEL.get(d, d),
+                          linewidth=0)
+            # Selective direct labels: the GMean group only, never every bar.
+            ax.annotate(f"{vals[-1]:.2f}",
+                        (bars[-1].get_x() + bars[-1].get_width() / 2, vals[-1]),
+                        ha="center", va="bottom", fontsize=7, color="#52514e",
+                        xytext=(0, 2), textcoords="offset points")
+
+        ax.axhline(1.0, color="#52514e", lw=1, ls=(0, (4, 3)), zorder=0)
+        ax.set_ylabel("IPC, normalized to baseline", fontsize=9, color="#0b0b0b")
+        ax.set_title(f"Cost of each Spectre defense — {core}",
+                     fontsize=10, color="#0b0b0b", pad=10)
+        ax.set_xticks(x)
+        ax.set_xticklabels([c.replace("_r", "") for c in cats],
+                           fontsize=8, color="#52514e")
+        ax.tick_params(axis="y", labelsize=8, colors="#52514e", length=0)
+        ax.tick_params(axis="x", length=0)
+        ax.set_ylim(0, max(1.05, max(
+            (v for d in defs_ for v in per_def[d].values()), default=1) * 1.15))
+        ax.grid(axis="y", color="#d8d7d2", lw=0.6, zorder=0)
+        ax.set_axisbelow(True)
+        for side in ("top", "right", "left"):
+            ax.spines[side].set_visible(False)
+        ax.spines["bottom"].set_color("#d8d7d2")
+        ax.legend(fontsize=8, frameon=False, ncol=min(len(defs_), 3),
+                  loc="upper center", bbox_to_anchor=(0.5, -0.14),
+                  labelcolor="#52514e")
+
+        out = os.path.join(RESULTS, f"fig_perf_{core}.png")
+        fig.savefig(out, bbox_inches="tight", facecolor=fig.get_facecolor())
+        plt.close(fig)
+        print(f"wrote {out}")
+
+
 if __name__ == "__main__":
     if not os.path.exists(os.path.join(RESULTS, "results.json")):
         sys.exit("results/results.json not found; run scripts/run_experiment.py")
@@ -299,3 +439,4 @@ if __name__ == "__main__":
     plot_byte0_histogram(d)
     plot_ltage(d)
     plot_window(d)
+    plot_perf(d)

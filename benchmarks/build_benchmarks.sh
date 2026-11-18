@@ -31,6 +31,16 @@ echo "built $OUT/spectre_v1_rv_rand (baseline, randomized run-length)"
 $CC $CFLAGS -DRAND_TRAIN -DUSE_LFENCE spectre_poc/spectre_v1_rv.c -o "$OUT/spectre_v1_rv_rand_lfence"
 echo "built $OUT/spectre_v1_rv_rand_lfence (defense, randomized run-length)"
 
+# Cross-core Spectre v1: victim and attacker pthreads on separate cores,
+# sharing only the L2. -DGEM5_SE skips the affinity syscalls gem5 SE mode does
+# not implement (threads are placed on cores automatically there).
+# -O0 keeps the cross-core timing loops intact (see linux-boot-tutorial.txt).
+XCFLAGS="-O0 -static -pthread -march=rv64gc_zicbom -fno-stack-protector -DGEM5_SE"
+$CC $XCFLAGS              spectre_poc/cross_core_spectre_v1.c -o "$OUT/cross_core_spectre_v1"
+echo "built $OUT/cross_core_spectre_v1 (baseline, 2-core)"
+$CC $XCFLAGS -DUSE_LFENCE spectre_poc/cross_core_spectre_v1.c -o "$OUT/cross_core_spectre_v1_lfence"
+echo "built $OUT/cross_core_spectre_v1_lfence (defense, 2-core)"
+
 echo "---"
 file "$OUT"/* 2>/dev/null || ls -l "$OUT"
 

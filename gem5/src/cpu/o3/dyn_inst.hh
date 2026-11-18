@@ -189,6 +189,11 @@ class DynInst : public ExecContext, public RefCounted
         HtmFromTransaction,
         NoCapableFU,           /// Processor does not have capability to
                                /// execute the instruction
+        // spectre-defense project (SPT port, see cpu/o3/spt.hh)
+        SpecDelayed,           /// Transmitter held back by the SPT gate
+        SpecUnsquashable,      /// Reached the visibility point
+        SpecPendingSquash,     /// Tainted mispredict: squash deferred
+        SpecSquashRaised,      /// Deferred squash has been sent to commit
         MaxFlags
     };
 
@@ -775,8 +780,17 @@ class DynInst : public ExecContext, public RefCounted
     /** Clears this instruction as being ready to commit. */
     void clearCanCommit() { status.reset(CanCommit); }
 
-    /** Returns whether or not this instruction is ready to commit. */
-    bool readyToCommit() const { return status[CanCommit]; }
+    /** Returns whether or not this instruction is ready to commit.
+     *  spectre-defense (SPT): a branch whose squash is being deferred must
+     *  not retire (nor let younger, wrong-path insts retire) until commit
+     *  has processed that squash. Squashed insts must still drain, or the
+     *  ROB head would deadlock. */
+    bool
+    readyToCommit() const
+    {
+        return status[CanCommit] &&
+               (!instFlags[SpecPendingSquash] || status[Squashed]);
+    }
 
     void setAtCommit() { status.set(AtCommit); }
 
@@ -955,6 +969,18 @@ class DynInst : public ExecContext, public RefCounted
     gem5::ThreadContext *tcBase() const override { return thread->getTC(); }
 
   public:
+    /** spectre-defense (SPT port) per-instruction state. */
+    bool specDelayed() const { return instFlags[SpecDelayed]; }
+    void specDelayed(bool f) { instFlags[SpecDelayed] = f; }
+    bool specUnsquashable() const { return instFlags[SpecUnsquashable]; }
+    void specUnsquashable(bool f) { instFlags[SpecUnsquashable] = f; }
+    bool specPendingSquash() const { return instFlags[SpecPendingSquash]; }
+    void specPendingSquash(bool f) { instFlags[SpecPendingSquash] = f; }
+    bool specSquashRaised() const { return instFlags[SpecSquashRaised]; }
+    void specSquashRaised(bool f) { instFlags[SpecSquashRaised] = f; }
+    /** Cycle at which the SPT gate first held this transmitter. */
+    uint64_t specDelayStart = 0;
+
     /** Is this instruction's memory access strictly ordered? */
     bool strictlyOrdered() const { return instFlags[IsStrictlyOrdered]; }
     void strictlyOrdered(bool so) { instFlags[IsStrictlyOrdered] = so; }

@@ -844,6 +844,10 @@ Commit::commit()
 
             toIEW->commitInfo[tid].mispredictInst =
                 fromIEW->mispredictInst[tid];
+            // spectre-defense (SPT): a deferred branch squash is now being
+            // carried out, so the branch itself may retire.
+            if (fromIEW->mispredictInst[tid])
+                fromIEW->mispredictInst[tid]->specPendingSquash(false);
             toIEW->commitInfo[tid].branchTaken =
                 fromIEW->branchTaken[tid];
             toIEW->commitInfo[tid].squashInst =

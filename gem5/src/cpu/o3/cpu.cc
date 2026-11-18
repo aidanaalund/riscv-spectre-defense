@@ -99,6 +99,8 @@ CPU::CPU(const BaseO3CPUParams &params)
 
       scoreboard(name() + ".scoreboard", regFile.totalNumPhysRegs()),
 
+      spt(this, params, regFile.totalNumPhysRegs()),
+
       isa(numThreads, NULL),
 
       timeBuffer(params.backComSize, params.forwardComSize),
@@ -388,6 +390,11 @@ CPU::tick()
     iew.tick();
 
     commit.tick();
+
+    // spectre-defense: end-of-cycle SPT update (visibility point, VP
+    // declassification, untaint propagation), as the original SPT did at
+    // the end of its commit stage.
+    spt.tick();
 
     // Now advance the time buffers
     timeBuffer.advance();

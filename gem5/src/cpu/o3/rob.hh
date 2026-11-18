@@ -288,6 +288,16 @@ class ROB
     /** ROB List of Instructions */
     std::list<DynInstPtr> instList[MaxThreads];
 
+  public:
+    /** spectre-defense (SPT): program-ordered view of a thread's ROB. */
+    const std::list<DynInstPtr> &
+    getInstList(ThreadID tid) const
+    {
+        return instList[tid];
+    }
+
+  private:
+
     /** Number of instructions that can be squashed in a single cycle.
      * A negative number means all instructions are squashed instantly
      * within on cycle

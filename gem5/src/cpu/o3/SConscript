@@ -69,6 +69,7 @@ if env['CONF']['BUILD_ISA']:
     Source('rename_map.cc')
     Source('rob.cc')
     Source('scoreboard.cc')
+    Source('spt.cc')
     Source('store_set.cc')
     Source('thread_context.cc')
     Source('thread_state.cc')
@@ -85,6 +86,7 @@ if env['CONF']['BUILD_ISA']:
     DebugFlag('ROB')
     DebugFlag('Rename')
     DebugFlag('Scoreboard')
+    DebugFlag('SPT')
     DebugFlag('StoreSet')
     DebugFlag('Writeback')
 

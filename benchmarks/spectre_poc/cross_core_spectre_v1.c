@@ -172,6 +172,24 @@
  
  static void pin_to_cpu(int cpu)
  {
+ #ifdef GEM5_SE
+     /*
+      * gem5 SE mode does not implement sched_setaffinity (syscall 122 is
+      * listed without a handler in src/arch/riscv/linux/se_workload.cc, so
+      * calling it aborts the simulation). It does not need to: SE mode gives
+      * each thread its own CPU context in creation order, so the main thread
+      * runs on cpu0 and the pthread_create()d worker on cpu1. Victim and
+      * attacker therefore sit on different cores sharing only the L2 --
+      * exactly the topology this PoC wants. The roles are swapped relative
+      * to a real Linux run (victim lands on cpu1), which is immaterial
+      * because the two cores are configured identically.
+      */
+     (void)cpu;
+     printf(
+         "gem5 SE: thread auto-placed on CPU %d (affinity is a no-op)\n",
+         sched_getcpu()
+     );
+ #else
      cpu_set_t mask;
  
      CPU_ZERO(&mask);
@@ -198,6 +216,7 @@
          cpu,
          sched_getcpu()
      );
+ #endif
  }
  
  

@@ -67,6 +67,7 @@
 #include "cpu/o3/rename.hh"
 #include "cpu/o3/rob.hh"
 #include "cpu/o3/scoreboard.hh"
+#include "cpu/o3/spt.hh"
 #include "cpu/o3/thread_state.hh"
 #include "cpu/simple_thread.hh"
 #include "cpu/timebuf.hh"
@@ -466,6 +467,13 @@ class CPU : public BaseCPU
 
     /** Integer Register Scoreboard */
     Scoreboard scoreboard;
+
+  public:
+    /** spectre-defense: Speculative Privacy Tracking (see spt.hh). */
+    SPT spt;
+    friend class SPT;
+
+  protected:
 
     std::vector<BaseISA *> isa;
 

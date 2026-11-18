@@ -15,3 +15,12 @@ m5out
 
 # Project
 results/
+
+# Development
+.vscode/
+
+# SPEC CPU2017
+benchmarks/spec2017/*
+!benchmarks/spec2017/MANIFEST.json
+benchmarks/bin/
+gem5/build/

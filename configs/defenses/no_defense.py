@@ -1,6 +1,6 @@
-"""Baseline: no Spectre defense. Hook point for the --defense flag."""
+"""Baseline: no Spectre defense."""
 
 
-def apply(system, cpu):
-    """Leave the core unmodified."""
+def apply(system, cpus, args):
+    """Leave the cores unmodified."""
     return

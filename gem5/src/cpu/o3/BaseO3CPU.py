@@ -207,6 +207,23 @@ class BaseO3CPU(BaseCPU):
     )
     needsTSO = Param.Bool(False, "Enable TSO Memory model")
 
+    # spectre-defense project: microarchitectural Spectre defenses.
+    specDefense = Param.String(
+        "none",
+        "Hardware Spectre defense: none | fence (delay every load/store "
+        "until no older branch is unresolved; models lfence-after-branch on "
+        "unmodified binaries) | spt (delay only secret-dependent accesses)")
+    sptThreatModel = Param.String(
+        "spectre",
+        "SPT visibility point: spectre (older branches resolved) | "
+        "futuristic (older insts completed)")
+    sptUntaint = Param.String(
+        "bwd", "SPT untaint propagation: none | fwd | bwd | ideal")
+    sptUntaintWidth = Param.Unsigned(
+        3, "SPT untaint broadcasts per cycle (ignored for ideal)")
+    sptLazyImplicitFlow = Param.Bool(
+        True, "SPT: defer squashes of mispredicted tainted branches")
+
     recvRespThrottling = Param.Bool(
         False, "Enable load receive response throttling in the LSQ"
     )

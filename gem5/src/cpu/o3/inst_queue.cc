@@ -1251,7 +1251,10 @@ InstructionQueue::getDeferredMemInstToExecute()
 {
     for (ListIt it = deferredMemInsts.begin(); it != deferredMemInsts.end();
          ++it) {
-        if ((*it)->translationCompleted() || (*it)->isSquashed()) {
+        // spectre-defense (SPT): a held transmitter is released once its
+        // address operand is public (forward untaint or the VP).
+        if ((*it)->translationCompleted() || (*it)->isSquashed() ||
+            ((*it)->specDelayed() && !cpu->spt.gateBlocks(*it))) {
             DynInstPtr mem_inst = std::move(*it);
             deferredMemInsts.erase(it);
             return mem_inst;
