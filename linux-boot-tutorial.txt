@@ -1,0 +1,43 @@
+RUN INFO FOR LINUX BOOT: ( from root of gem5)
+
+./build/RISCV/gem5.opt configs/example/gem5_library/riscv-ubuntu-run.py
+
+LIVE VIEW INSTRUCTION COUNTS:
+cd /workspaces/gem5 && while true; do kill -USR1 $(pgrep -n gem5.opt); sleep 5; grep -E '^(simTicks|simInsts) ' m5out/stats.txt | tail -n 2; echo '---'; done
+
+Live Linux console output
+cd /workspaces/gem5 && tail -n 20 -f m5out/board.platform.terminal
+
+Once boot finsihes:
+
+make -C util/term
+
+Connect:
+
+cd /workspaces/gem5 && ./util/term/m5term 127.0.0.1 <port#>
+
+port # can be seen in output :
+
+board.platform.terminal: Listening for connections on port 3456
+
+UPDATES 11/13:
+
+1. Save checkpoint (inside gem5 Ubuntu):
+gem5-bridge hypercall 7
+
+2. Resume from checkpoint (Docker terminal, from /workspaces/gem5):
+./build/RISCV/gem5.opt configs/example/gem5_library/riscv-ubuntu-run.py --restore
+
+3. Compile with -O0 (Docker terminal, from /workspaces/gem5):
+riscv64-linux-gnu-gcc -O0 -pthread -static -march=rv64gc_zicbom benchmarks/cross_core/cross_core_spectre_v1.c -o benchmarks/cross_core/cross_core_spectre_v1
+
+4. Transfer executable (inside gem5 Ubuntu, already in /tmp):
+gem5-bridge readfile > cross_core_spectre_v1
+
+5. Make executable (inside gem5 Ubuntu, in /tmp):
+chmod +x cross_core_spectre_v1
+
+6. Run (inside gem5 Ubuntu, in /tmp):
+./cross_core_spectre_v1
+
+Successfully able to run cross core spectre I think - need to look through code tbh
