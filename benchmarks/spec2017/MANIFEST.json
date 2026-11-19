@@ -1,0 +1,60 @@
+{
+  "_comment": [
+    "SPEC CPU2017 benchmarks for the Spectre-defense study. Drop each",
+    "benchmark's sources at benchmarks/spec2017/<name>/src/ and its run inputs",
+    "at benchmarks/spec2017/<name>/run/, then `make benchmarks`.",
+    "",
+    "From a SPEC CPU2017 install, for each <name> below:",
+    "  cp -r $SPEC/benchspec/CPU/<name>/src          benchmarks/spec2017/<name>/src",
+    "  cp -r $SPEC/benchspec/CPU/<name>/data/test/input/*  benchmarks/spec2017/<name>/run/",
+    "(use data/train/input for the longer 'train' workload instead)",
+    "",
+    "'run' is the argv the simulated binary gets; 'cflags' are extra compiler",
+    "flags beyond the common set in build_spec2017.sh. 'why' records what each",
+    "benchmark contributes to the evaluation. VERIFY the run lines against your",
+    "SPEC tree's object.pm / control files -- they are the documented test-input",
+    "invocations but SPEC versions differ."
+  ],
+
+  "505.mcf_r": {
+    "lang": "c",
+    "run": ["inp.in"],
+    "cflags": [],
+    "why": "Pointer-chasing network simplex. Highest L1D miss ratio of the suite -> the worst case for any delay-on-miss defense and a heavy user of SPT's load-delay path."
+  },
+
+  "519.lbm_r": {
+    "lang": "c",
+    "run": ["20", "reference.dat", "0", "1", "100_100_130_cf_a.of"],
+    "cflags": [],
+    "why": "Streaming lattice-Boltzmann. Few branches, regular access -> near-zero speculation shadow; shows the floor of each defense's overhead."
+  },
+
+  "531.deepsjeng_r": {
+    "lang": "cpp",
+    "run": ["test.txt"],
+    "cflags": [],
+    "why": "Alpha-beta chess search. Very high branch-misprediction rate -> stresses SPT's deferred-squash (implicit flow) path hardest."
+  },
+
+  "541.leela_r": {
+    "lang": "cpp",
+    "run": ["test.sgf"],
+    "cflags": [],
+    "why": "Monte-Carlo tree search. Branchy and pointer-heavy; a second, independent high-mispredict workload."
+  },
+
+  "508.namd_r": {
+    "lang": "cpp",
+    "run": ["--input", "apoa1.input", "--iterations", "1", "--output", "apoa1.out"],
+    "cflags": [],
+    "why": "Dense FP molecular dynamics. Cache-resident and predictable -> the best case, where a good defense should cost almost nothing."
+  },
+
+  "557.xz_r": {
+    "lang": "c",
+    "run": ["cpu2006docs.tar.xz", "4", "055ce243071129412e9dd0b3b69a21654033a9b723d874b2015c774fac1553d9713be561ca86f74e4f16f22e664fc17a79f30caa5ad2c04fbc447549c2810fae", "1548636", "1555348", "0"],
+    "cflags": [],
+    "why": "Compression: mixed integer/branch behaviour with a working set between mcf and namd. Fills the middle of the memory-behaviour range."
+  }
+}
